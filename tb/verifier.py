@@ -226,7 +226,8 @@ def main():
         parser.error(f"suite inconnue : {', '.join(inconnues)} (connues : {', '.join(SUITES)})")
     codes = [verifier(nom, SUITES[nom]) for nom in (args.suites or SUITES)]
     print()
-    return max(codes)
+    # Un échec (1) l'emporte toujours sur un mutant qui survit (2).
+    return 1 if 1 in codes else 2 if 2 in codes else 0
 
 
 if __name__ == "__main__":

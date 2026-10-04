@@ -9,7 +9,7 @@ jobs:
     name: C (lexeur, GEMM de référence)
     runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Lexeur
         run: compiler/lexer/check.sh
       - name: GEMM de référence (AddressSanitizer, UBSan)
@@ -21,13 +21,13 @@ jobs:
     env:
       VERILATOR_VERSION: v5.052
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.13"
       - name: Verilator en cache
         id: cache-verilator
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: ~/verilator
           key: verilator-${{ env.VERILATOR_VERSION }}-ubuntu-24.04
