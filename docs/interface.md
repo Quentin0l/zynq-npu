@@ -4,6 +4,8 @@
 
 Ce document est le contrat entre quatre implémentations qui ne doivent jamais diverger : le RTL (`rtl/`), le compilateur (`compiler/`), le simulateur doré (`sim/`, S3) et le runtime du Cortex-A9 (`runtime/`, S2 et S4). Chacune se construit à partir de lui seul.
 
+Il décrit le NPU v1, le moteur de `rtl/moteur/`. Le tableau v2 (`rtl/tableau/`) devra pouvoir se brancher derrière le même contrat : une commande dit quoi calculer et où sont les données, pas comment le matériel s'y prend.
+
 **Le test d'un bon contrat.** Deux personnes qui ne se parlent pas l'implémentent chacune de leur côté. Leurs octets sont identiques, au bit près.
 
 <!--
@@ -17,7 +19,7 @@ du parcours accélérateurs présente les options et leurs coûts.
 ## 1. Vue d'ensemble
 
 <!-- Un schéma (ASCII ou mermaid) : le PS (Cortex-A9, DDR), les ports GP et HP,
-l'AXI DMA, le NPU (tampons, tableau 8 × 8, contrôle). Pour chaque lien : qui est
+l'AXI DMA, le NPU (tampons, moteur, contrôle). Pour chaque lien : qui est
 maître, qui est esclave ? -->
 
 ## 2. Registres de contrôle (AXI4-Lite, port M_AXI_GP0)
@@ -62,13 +64,14 @@ Pour chacune : son code, ses champs, son effet exact sur les tampons et les accu
 
 | Tampon | Rôle | Largeur d'un mot | Profondeur | Ce que contient un mot | Double tampon ? |
 |---|---|---|---|---|---|
-| A | | | | | |
-| B | | | | | |
-| sortie | | | | | |
+| poids | | | | | |
+| activations | | | | | |
+| biais | | | | | |
 
 À trancher ici :
+- Combien de MAC (P) ? Ce nombre fixe la largeur d'un mot de poids : P octets.
 - Dans les commandes, une adresse compte-t-elle des mots ou des octets ?
-- Une somme partielle peut-elle quitter le tableau puis y revenir ? Cela décide quels ordres de boucles le compilateur a le droit d'émettre (voir le tableau de trafic de `ref/check.sh`).
+- Une somme partielle peut-elle quitter les accumulateurs puis y revenir ? Cela décide quels ordres de boucles le compilateur a le droit d'émettre (voir le tableau de trafic de `ref/check.sh`).
 - Que sort le NPU : des int32 bruts, ou des int8 requantifiés ? Qui requantifie ?
 
 ## 5. Largeurs des bus et chemins de données
@@ -86,7 +89,7 @@ Pour chacune : son code, ses champs, son effet exact sur les tampons et les accu
 
 ## 7. Exemple complet
 
-Un GEMM 16 × 16 × 16 en tuiles 8 × 8 × 8 : la suite exacte des commandes, mot par mot, en hexadécimal, avec un commentaire par ligne.
+Un GEMM 16 × 16 × 16, requantifié en int8 : la suite exacte des commandes, mot par mot, en hexadécimal, avec un commentaire par ligne.
 
 ```text
 (à écrire)

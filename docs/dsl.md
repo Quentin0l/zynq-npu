@@ -14,7 +14,7 @@ algorithme / schedule, et rappelle la notation EBNF.
 
 - Types : tenseurs int8 et int32, de quelles formes ?
 - Opérations : `matmul`, `requant`, `relu`. Avec quels paramètres ?
-- Schedule : tuiles M, N, K, ordre des boucles, projection sur le tableau, poids résidents, double tampon.
+- Schedule : tuiles M, N, K, ordre des boucles, projection sur le matériel (les P MAC du moteur), poids résidents, double tampon.
 - Hors périmètre de la v1 : ?
 
 ## 2. Deux programmes d'exemple

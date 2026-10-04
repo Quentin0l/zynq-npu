@@ -12,7 +12,10 @@ jobs:
       - uses: actions/checkout@v7
       - name: Lexeur
         run: compiler/lexer/check.sh
-      - name: GEMM de référence (AddressSanitizer, UBSan)
+      # Exercice en cours (S1) : il ne bloque pas la CI. Quand ref/check.sh
+      # passe, enlève continue-on-error pour que la CI le protège.
+      - name: GEMM de référence, en cours (AddressSanitizer, UBSan)
+        continue-on-error: true
         run: ref/check.sh
 
   rtl:
@@ -46,8 +49,12 @@ jobs:
         run: |
           echo "$HOME/verilator/bin" >> "$GITHUB_PATH"
           pip install -r requirements.txt
-      - name: Bancs cocotb et mutants
-        # Code 2 : tous les tests passent, mais un mutant survit (un test reste à écrire).
+      # Code 2 : tous les tests passent, mais un mutant survit (un test reste à écrire).
+      - name: NPU v1, le moteur (bancs cocotb et mutants)
         run: |
           verilator --version
-          tb/check.sh || [ $? -eq 2 ]
+          tb/check.sh v1 || [ $? -eq 2 ]
+      # La v2 est en cours : elle s'affiche dans la CI sans la bloquer.
+      - name: NPU v2, le tableau 8 × 8, en cours
+        continue-on-error: true
+        run: tb/check.sh v2 || [ $? -eq 2 ]
