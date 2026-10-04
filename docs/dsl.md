@@ -37,10 +37,10 @@ Le même algorithme, sous deux schedules différents.
 
 ## 4. Grammaire
 
-Notation EBNF : `"x"` est un token écrit tel quel ; `( … )*` répète zéro fois ou plus ; `( … )?` rend facultatif ; `|` sépare des alternatives ; une règle se termine par `;`.
+Notation de la leçon 3 du parcours compilateurs : `"x"` entre guillemets est un token ; un nom sans guillemets est une règle ; un espace veut dire « puis » ; `|` veut dire « ou » ; `( … )*` répète le groupe 0, 1 ou plusieurs fois ; `( … )?` le rend facultatif.
 
 ```ebnf
-programme = ... ;
+programme = ...
 ```
 
 ## 5. Sens
