@@ -1,0 +1,19 @@
+# Environnement Python : un venv local, ou un lien vers un venv existant
+.venv
+__pycache__/
+
+# Simulation
+tb/sim_build/
+tb/results.xml
+*.vcd
+*.fst
+
+# Binaires produits par les check.sh
+compiler/lexer/lex
+compiler/lexer/got.txt
+ref/test_gemm
+ref/test_gemm.dSYM/
+*.o
+
+# macOS
+.DS_Store
