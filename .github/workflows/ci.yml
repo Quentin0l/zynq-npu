@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  c:
+    name: C (lexeur, GEMM de référence)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Lexeur
+        run: compiler/lexer/check.sh
+      - name: GEMM de référence (AddressSanitizer, UBSan)
+        run: ref/check.sh
+
+  rtl:
+    name: RTL (cocotb + Verilator, mutants)
+    runs-on: ubuntu-24.04
+    env:
+      VERILATOR_VERSION: v5.052
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Verilator en cache
+        id: cache-verilator
+        uses: actions/cache@v4
+        with:
+          path: ~/verilator
+          key: verilator-${{ env.VERILATOR_VERSION }}-ubuntu-24.04
+      - name: Construire Verilator (premier passage seulement)
+        if: steps.cache-verilator.outputs.cache-hit != 'true'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y git autoconf flex bison help2man perl make g++ libfl-dev zlib1g-dev
+          git clone --depth 1 --branch "$VERILATOR_VERSION" https://github.com/verilator/verilator.git /tmp/verilator
+          cd /tmp/verilator
+          autoconf
+          ./configure --prefix="$HOME/verilator"
+          make -j"$(nproc)"
+          make install
+      - name: Outils
+        run: |
+          echo "$HOME/verilator/bin" >> "$GITHUB_PATH"
+          pip install -r requirements.txt
+      - name: Bancs cocotb et mutants
+        # Code 2 : tous les tests passent, mais un mutant survit (un test reste à écrire).
+        run: |
+          verilator --version
+          tb/check.sh || [ $? -eq 2 ]
