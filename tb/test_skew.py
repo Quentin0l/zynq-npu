@@ -1,4 +1,4 @@
-# test_skew.py : banc cocotb du décalage d'entrée (leçon 8, TODO 1 dans rtl/skew.sv).
+# test_skew.py : banc cocotb du décalage d'entrée (leçon 8, TODO 1 dans rtl/tableau/skew.sv).
 # Fourni par le parcours.
 #
 # Les deux tests sont résolus : ils vérifient la spécification D1 à D3 de skew.sv.
@@ -10,7 +10,7 @@ import cocotb
 from cocotb.clock import Clock
 from cocotb.triggers import RisingEdge, Timer
 
-from modele import depaqueter, empaqueter
+from modele_tableau import depaqueter, empaqueter
 
 
 def nb_voies(dut):

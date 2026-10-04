@@ -1,11 +1,11 @@
 # test_systolic_array.py : banc cocotb du tableau systolique (leçon 8).
 # Fourni par le parcours ; les TODO 2 à 4 sont à écrire.
 #
-# Le tableau attend des entrées DÉJÀ décalées (cf. l'en-tête de rtl/systolic_array.sv) :
+# Le tableau attend des entrées DÉJÀ décalées (cf. l'en-tête de rtl/tableau/systolic_array.sv) :
 #   voie r de a_row_i : A[r][k] au cycle k + r
 #   voie c de b_col_i : B[k][c] au cycle k + c
 # Ici, c'est le banc qui fait ce décalage, en Python (decale, pousser). Dans
-# test_systolic_tile.py, c'est ton module rtl/skew.sv qui le fait, en matériel.
+# test_systolic_tile.py, c'est ton module rtl/tableau/skew.sv qui le fait, en matériel.
 #
 # Numérotation : le front 0 est celui qui échantillonne A[0][0] et B[0][0].
 
@@ -13,7 +13,7 @@ import cocotb
 from cocotb.clock import Clock
 from cocotb.triggers import RisingEdge, Timer
 
-from modele import ecart, empaqueter, gemm_ref, matrice_aleatoire
+from modele_tableau import ecart, empaqueter, gemm_ref, matrice_aleatoire
 
 
 # ---------------------------------------------------------------------------

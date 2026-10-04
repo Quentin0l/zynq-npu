@@ -9,8 +9,9 @@ Pour chaque suite demandée (cf. SUITES ci-dessous) :
 
 Usage (c'est ce que fait ./check.sh) :
     python3 verifier.py                 # toutes les suites
-    python3 verifier.py tableau tuile   # seulement celles-là
-    WAVES=1 python3 verifier.py tuile   # + chronogramme dump.vcd dans tb/
+    python3 verifier.py v1              # le NPU v1, le moteur (v2 : le tableau)
+    python3 verifier.py couche tableau  # seulement celles-là
+    WAVES=1 python3 verifier.py couche  # + chronogramme dump.vcd dans tb/
 
 Code de sortie : 0 si tout passe et que tous les mutants sont tués ; 1 si un
 test actif échoue ou si le RTL ne compile pas ; 2 si les tests passent mais
@@ -33,23 +34,59 @@ BUILD = TB / "sim_build"
 
 # Une suite = un module de tête, son fichier de tests, ses sources, ses paramètres,
 # et éventuellement des mutants qui remplacent l'un de ses fichiers.
+MOTEUR = "rtl/moteur/"
+TABLEAU = "rtl/tableau/"
 SUITES = {
+    # NPU v1 : le moteur matrice-vecteur, vérifié brique par brique (leçons 1 à 6).
+    "mac": dict(
+        top="mac", tests="test_mac",
+        sources=[MOTEUR + "mac.sv"],
+        mutants=(MOTEUR + "mac.sv", "tb/mutants/mac/mutant_*.sv"),
+    ),
+    "rangee": dict(
+        top="mac_row", tests="test_mac_row",
+        sources=[MOTEUR + "mac.sv", MOTEUR + "mac_row.sv"],
+        mutants=(MOTEUR + "mac_row.sv", "tb/mutants/mac_row/mutant_*.sv"),
+    ),
+    "passe": dict(
+        top="pass_engine", tests="test_pass_engine",
+        sources=[MOTEUR + f for f in ("mac.sv", "mac_row.sv", "weight_buffer.sv", "pass_engine.sv")],
+        mutants=(MOTEUR + "pass_engine.sv", "tb/mutants/pass_engine/mutant_*.sv"),
+    ),
+    "requant": dict(
+        top="requant", tests="test_requant",
+        sources=[MOTEUR + "requant.sv"],
+        mutants=(MOTEUR + "requant.sv", "tb/mutants/requant/mutant_*.sv"),
+    ),
+    "couche": dict(
+        top="layer_engine", tests="test_layer",
+        sources=[MOTEUR + f for f in ("mac.sv", "mac_row.sv", "weight_buffer.sv", "pass_engine.sv",
+                                      "requant.sv", "lut_ram.sv", "layer_seq.sv", "layer_engine.sv")],
+        mutants=(MOTEUR + "layer_seq.sv", "tb/mutants/layer_seq/mutant_*.sv"),
+    ),
+    # NPU v2 : le tableau systolique 8 × 8 (leçon 8).
     "skew": dict(
         top="skew", tests="test_skew",
-        sources=["rtl/skew.sv"],
+        sources=[TABLEAU + "skew.sv"],
         params="-Gn_g=8",
     ),
     "tableau": dict(
         top="systolic_array", tests="test_systolic_array",
-        sources=["rtl/pe.sv", "rtl/systolic_array.sv"],
+        sources=[TABLEAU + "pe.sv", TABLEAU + "systolic_array.sv"],
         params="-Gn_g=8",
-        mutants=("rtl/pe.sv", "tb/mutants/pe/mutant_*.sv"),
+        mutants=(TABLEAU + "pe.sv", "tb/mutants/pe/mutant_*.sv"),
     ),
     "tuile": dict(
         top="systolic_tile", tests="test_systolic_tile",
-        sources=["rtl/pe.sv", "rtl/systolic_array.sv", "rtl/skew.sv", "rtl/systolic_tile.sv"],
+        sources=[TABLEAU + f for f in ("pe.sv", "systolic_array.sv", "skew.sv", "systolic_tile.sv")],
         params="-Gn_g=8",
     ),
+}
+
+# Des groupes, pour lancer une version du NPU d'un coup : ./check.sh v1
+GROUPES = {
+    "v1": ["mac", "rangee", "passe", "requant", "couche"],
+    "v2": ["skew", "tableau", "tuile"],
 }
 
 
@@ -219,12 +256,17 @@ def verifier(nom, suite):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("suites", nargs="*", help=f"parmi {', '.join(SUITES)} (défaut : toutes)")
+    parser.add_argument("suites", nargs="*",
+                        help=f"des suites parmi {', '.join(SUITES)}, ou un groupe, {' ou '.join(GROUPES)} (défaut : tout)")
     args = parser.parse_args()
-    inconnues = [s for s in args.suites if s not in SUITES]
+    noms = []
+    for nom in args.suites or list(SUITES):
+        noms += GROUPES.get(nom, [nom])
+    inconnues = [n for n in noms if n not in SUITES]
     if inconnues:
-        parser.error(f"suite inconnue : {', '.join(inconnues)} (connues : {', '.join(SUITES)})")
-    codes = [verifier(nom, SUITES[nom]) for nom in (args.suites or SUITES)]
+        parser.error(f"suite inconnue : {', '.join(inconnues)} "
+                     f"(suites : {', '.join(SUITES)} ; groupes : {', '.join(GROUPES)})")
+    codes = [verifier(nom, SUITES[nom]) for nom in noms]
     print()
     # Un échec (1) l'emporte toujours sur un mutant qui survit (2).
     return 1 if 1 in codes else 2 if 2 in codes else 0

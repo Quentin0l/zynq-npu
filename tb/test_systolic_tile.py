@@ -5,7 +5,7 @@
 # telle qu'elle est rangée :
 #   a_col_i : la colonne k de A, voie r = A[r][k]
 #   b_row_i : la ligne k de B,   voie c = B[k][c]
-# C'est ton rtl/skew.sv, instancié deux fois dans rtl/systolic_tile.sv, qui
+# C'est ton rtl/tableau/skew.sv, instancié deux fois dans rtl/tableau/systolic_tile.sv, qui
 # transforme ces mots en entrées décalées pour le tableau.
 #
 # Les deux tests sont résolus : ils vérifient ton TODO 1, le décalage en matériel.
@@ -14,7 +14,7 @@ import cocotb
 from cocotb.clock import Clock
 from cocotb.triggers import RisingEdge, Timer
 
-from modele import ecart, empaqueter, gemm_ref, matrice_aleatoire
+from modele_tableau import ecart, empaqueter, gemm_ref, matrice_aleatoire
 
 
 def taille(dut):

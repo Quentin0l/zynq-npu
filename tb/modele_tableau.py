@@ -1,9 +1,9 @@
-"""modele.py : le modèle de référence du NPU, en Python, exact au bit près.
+"""modele_tableau.py : le modèle de référence du tableau 8 × 8 (NPU v2), exact au bit près.
 
-Fourni par le parcours, à enrichir au fil des semaines.
+Fourni par le parcours. Le modèle du moteur (NPU v1) est dans modele_npu.py.
 
-Partagé par tous les bancs de tb/. Un banc compare toujours le RTL à ce modèle,
-jamais à une valeur recopiée d'une simulation.
+Un banc compare toujours le RTL à ce modèle, jamais à une valeur recopiée
+d'une simulation.
 
 Conventions :
   - une matrice est une liste de lignes : A[i][k] ;

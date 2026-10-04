@@ -4,7 +4,7 @@
 #
 # Appel direct, pour une suite (cf. SUITES dans verifier.py) :
 #   make TOP=systolic_array TESTS=test_systolic_array \
-#        SRCS="../rtl/pe.sv ../rtl/systolic_array.sv" PARAMS=-Gn_g=8
+#        SRCS="../rtl/tableau/pe.sv ../rtl/tableau/systolic_array.sv" PARAMS=-Gn_g=8
 # Avec WAVES=1, le chronogramme est écrit dans dump.vcd, dans ce dossier.
 
 SIM             ?= verilator

@@ -1,4 +1,4 @@
-// Mutant fourni par le parcours : une copie de rtl/pe.sv avec un bug planté.
+// Mutant fourni par le parcours : une copie de rtl/tableau/pe.sv avec un bug planté.
 // Ne l'ouvre pas avant d'avoir écrit tes tests : c'est à eux de le trouver.
 `timescale 1ns / 1ps
 
