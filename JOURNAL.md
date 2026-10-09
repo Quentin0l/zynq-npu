@@ -20,6 +20,12 @@ Livrable : deux pages figées, l'interface du NPU et la grammaire du DSL ; un le
 
 **Bilan de la semaine** : à écrire le 11 octobre. Ce qui a marché, ce qui a cassé, ce qui glisse en S2.
 
+## 9 octobre : OpenCL, troisième cible du GEMM
+
+Deux semaines, jusqu'au 23 octobre, pour une troisième cible du même GEMM : OpenCL, sur GPU et sur CPU. Les leçons 10 et 11 du parcours accélérateurs font écrire un kernel naïf, puis un kernel tuilé en mémoire locale. Ensuite, un prototype d'export C++/OpenCL pour [Aidge](https://eclipse.dev/aidge/), le framework d'IA open source du CEA, dans un dépôt à part. La feuille de route du NPU continue en parallèle. [Jalon « OpenCL et Aidge »](https://github.com/Quentin0l/zynq-npu/milestone/9).
+
+**Une mesure à ne pas croire.** Sur le GPU d'Apple, les compteurs de profiling d'OpenCL donnaient des durées environ 50 fois trop courtes, donc des dizaines de milliers de Gop/s. Le banc mesure désormais avec l'horloge de l'hôte.
+
 ## S2 à S8
 
 Les tâches sont dans les jalons [S2](https://github.com/Quentin0l/zynq-npu/milestone/2), [S3](https://github.com/Quentin0l/zynq-npu/milestone/3), [S4](https://github.com/Quentin0l/zynq-npu/milestone/4), [S5](https://github.com/Quentin0l/zynq-npu/milestone/5), [S6](https://github.com/Quentin0l/zynq-npu/milestone/6), [S7](https://github.com/Quentin0l/zynq-npu/milestone/7) et [S8](https://github.com/Quentin0l/zynq-npu/milestone/8). Chaque section s'ouvre ici le lundi de sa semaine. La v2 a son issue à part, sans jalon : [#34](https://github.com/Quentin0l/zynq-npu/issues/34).

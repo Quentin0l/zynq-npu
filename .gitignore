@@ -17,3 +17,7 @@ ref/test_gemm.dSYM/
 
 # macOS
 .DS_Store
+
+# OpenCL
+opencl/build/
+opencl/build.log

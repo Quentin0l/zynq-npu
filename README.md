@@ -27,6 +27,10 @@ Chaque brique a son banc cocotb et ses mutants. En simulation, le moteur exécut
 
 **v2, le tableau systolique 8 × 8** (`rtl/tableau/`). Il calcule un GEMM par tuiles de 8 × 8, avec 64 MAC et des données qui ne voyagent qu'entre PE voisins. Le PE et le tableau existent déjà ; le décalage d'entrée et le contrôleur sont en cours. Il se branchera derrière le même contrat d'interface que la v1.
 
+## Le même GEMM, en OpenCL
+
+`opencl/` exécute le GEMM int8 → int32 sur un device OpenCL : le GPU d'un Mac par l'OpenCL d'Apple, ou le CPU par [PoCL](https://portablecl.org/) en CI. L'hôte est en C++17, construit avec CMake, au-dessus d'une fine surcouche RAII de l'API C. Les kernels, en OpenCL C, sont un naïf (un work-item par case de C) et un tuilé en mémoire locale. Les résultats sont vérifiés au bit près contre la référence de `ref/`. C'est une troisième cible pour le même calcul, à côté du C et du NPU, et un futur back-end du générateur de kernels.
+
 ## Où en est le projet
 
 Huit semaines, du 5 octobre au 29 novembre 2026. Chaque semaine est un [jalon](https://github.com/Quentin0l/zynq-npu/milestones) ; le récit est dans le [journal](JOURNAL.md).
@@ -50,6 +54,7 @@ Huit semaines, du 5 octobre au 29 novembre 2026. Chaque semaine est un [jalon](h
 | `rtl/tableau/` | NPU v2 : PE, tableau systolique, décalages d'entrée |
 | `tb/` | Bancs cocotb + Verilator, modèles Python au bit près, mutants |
 | `ref/` | GEMM de référence en C : naïf, et parcouru selon un schedule |
+| `opencl/` | Le GEMM en OpenCL : hôte C++17 et CMake, kernels naïf et tuilé |
 | `compiler/` | Le compilateur du DSL, en C (aujourd'hui : le lexeur) |
 | `docs/` | Le contrat d'interface, la grammaire du DSL, le journal des bugs, les notes de lecture |
 
@@ -64,7 +69,7 @@ python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
 make test
 ```
 
-`make test` vérifie ce qui est fini : le lexeur et le NPU v1. Le reste se lance à part : `tb/check.sh v2` pour le tableau, `ref/check.sh` pour les GEMM en C, ou une seule suite, comme `tb/check.sh couche`. La CI affiche aussi les travaux en cours, sans qu'ils la bloquent.
+`make test` vérifie ce qui est fini : le lexeur et le NPU v1. Le reste se lance à part : `tb/check.sh v2` pour le tableau, `ref/check.sh` pour les GEMM en C, `opencl/check.sh` pour OpenCL (avec CMake et une implémentation d'OpenCL), ou une seule suite, comme `tb/check.sh couche`. La CI affiche aussi les travaux en cours, sans qu'ils la bloquent.
 
 **Des mutants pour juger les tests.** Chaque banc tourne d'abord sur le RTL, puis sur des copies où un bug a été planté (`tb/mutants/`). Si un mutant survit, il manque un test.
 

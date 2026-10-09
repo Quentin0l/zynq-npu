@@ -4,8 +4,9 @@
 # Les travaux en cours, à lancer à la main :
 #   make test-ref   les GEMM de référence en C (exercice de la S1)
 #   make test-v2    le NPU v2, le tableau 8 × 8
+#   make test-opencl  le GEMM en OpenCL (leçons 10 et 11)
 
-.PHONY: test test-c test-rtl test-ref test-v2
+.PHONY: test test-c test-rtl test-ref test-v2 test-opencl
 
 test: test-c test-rtl
 
@@ -21,3 +22,6 @@ test-ref:
 
 test-v2:
 	tb/check.sh v2 || [ $$? -eq 2 ]
+
+test-opencl:
+	opencl/check.sh

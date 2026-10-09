@@ -58,3 +58,19 @@ jobs:
       - name: NPU v2, le tableau 8 × 8, en cours
         continue-on-error: true
         run: tb/check.sh v2 || [ $? -eq 2 ]
+
+  opencl:
+    name: OpenCL (PoCL, sur CPU)
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - name: PoCL et le chargeur OpenCL
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ocl-icd-opencl-dev opencl-headers pocl-opencl-icd clinfo
+          clinfo -l
+      # Exercice en cours (leçons 10 et 11) : il ne bloque pas la CI. Quand
+      # opencl/check.sh passe, enlève continue-on-error.
+      - name: GEMM OpenCL, en cours
+        continue-on-error: true
+        run: OCL_DEVICE=cpu opencl/check.sh
