@@ -55,9 +55,12 @@ def multiplicateur(M):
 
 
 def requant_ref(acc, bias, m0, n, zp, relu):
-    """La spécification Q1 à Q5 : m0 et n sont les ENTIERS, pas le réel M."""
+    """La spécification Q1 à Q5 : m0 et n sont les ENTIERS, pas le réel M.
+
+    Depuis le 2026-11-13, Q3 tronque vers -inf sans arrondir, comme AIfES.
+    """
     s = 31 + n
-    r = ((acc + bias) * m0 + (1 << (s - 1))) >> s
+    r = ((acc + bias) * m0) >> s
     y = r + zp
     plancher = zp if relu else -128
     return max(plancher, min(127, y))

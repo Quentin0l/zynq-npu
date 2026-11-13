@@ -1,5 +1,7 @@
 `timescale 1ns / 1ps
 // Provenance : exercice 0005 du parcours (spécification fournie, TODO écrit par l'auteur du dépôt).
+// Modifié le 2026-11-13 : plus d'arrondi en Q3, pour donner au bit près les mêmes
+// int8 qu'AIfES (aimath_q7_default_linear32_bt), la référence du réseau réel.
 
 // =============================================================================
 // requant.sv : l'unité de requantification. Elle ramène la somme 32 bits d'un
@@ -10,8 +12,9 @@
 // Toute l'arithmétique interne se fait sur 64 bits SIGNÉS.
 //   Q1. v = acc_i + bias_i                 (bias_i : le biais corrigé, en int32)
 //   Q2. p = v * m0_i                        (m0_i : le multiplicateur entier, dans [2^30, 2^31))
-//   Q3. s = 31 + shift_i ;  r = (p + 2^(s-1)) >>> s
-//       Arrondi au plus proche (les demis vers le haut), puis décalage ARITHMÉTIQUE.
+//   Q3. s = 31 + shift_i ;  r = p >>> s
+//       Décalage ARITHMÉTIQUE, sans arrondi : r est tronqué vers -inf, comme
+//       dans AIfES. Avec m0_i = 2^30, l'échelle vaut 2^-(shift_i + 1).
 //   Q4. y = r + zp_i                        (zp_i : le point zéro de la sortie)
 //   Q5. Saturation : q_o = y écrêté dans [plancher, 127], où
 //       plancher = zp_i si relu_i = 1 (ReLU), et -128 sinon.
@@ -45,7 +48,7 @@ module requant (
     always_comb begin: comb_0
          v_s = 64'(acc_i) + 64'(bias_i);
          p_s = v_s * m0_i;
-         r_s = (p_s + 2**(31 + shift_i-1)) >>> (31 + shift_i);
+         r_s = p_s >>> (31 + shift_i);
          y_s = r_s + 64'(zp_i);        
         plancher_s = (relu_i == 1'b1) ? 64'(zp_i) : -64'sd128;
         q_o = (y_s > 64'sd127)  ? 8'sd127 : (y_s < plancher_s) ? plancher_s[7:0] :y_s[7:0];

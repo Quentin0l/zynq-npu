@@ -16,7 +16,7 @@ from cocotb.triggers import Timer
 # ---------------------------------------------------------------------------
 def requant_ref(acc, bias, m0, n, zp, relu):
     s = 31 + n
-    r = ((acc + bias) * m0 + (1 << (s - 1))) >> s   # Q1 à Q3
+    r = ((acc + bias) * m0) >> s                    # Q1 à Q3 : tronqué vers -inf, comme AIfES
     y = r + zp                                      # Q4
     plancher = zp if relu else -128                 # Q5
     return max(plancher, min(127, y))
@@ -53,12 +53,16 @@ async def requantifier(dut, acc, bias, M, zp, relu=False):
 
 # ---------------------------------------------------------------------------
 # Tests résolus.
+# Depuis le 2026-11-13, Q3 tronque sans arrondir (comme AIfES). Les valeurs
+# attendues prennent M = 2^-7, une puissance de deux exacte, comme les échelles
+# d'AIfES ; avec M = 0,005, m0 rend M un rien plus grand que 0,005, et
+# -1 000 donnerait -5,0000000016, tronqué à -6.
 # ---------------------------------------------------------------------------
 @cocotb.test
 async def test_exemple_de_la_lecon(dut):
-    """M = 0,005 : 1 000 donne 5, et 1 150 (soit 5,75) s'arrondit à 6."""
-    for acc, attendu in [(1000, 5), (1150, 6), (1049, 5), (0, 0)]:
-        obtenu, ref = await requantifier(dut, acc, 0, 0.005, zp=0)
+    """M = 2^-7 : 640 donne 5, et 736 (soit 5,75) se tronque à 5, comme dans AIfES."""
+    for acc, attendu in [(640, 5), (736, 5), (671, 5), (0, 0)]:
+        obtenu, ref = await requantifier(dut, acc, 0, 2 ** -7, zp=0)
         assert ref == attendu, "le modèle de référence lui-même est faux"
         assert obtenu == attendu, f"acc = {acc} : q_o = {obtenu}, attendu {attendu}"
 
@@ -80,11 +84,11 @@ async def test_biais_et_point_zero(dut):
 async def test_negatifs(dut):
     """TODO 2 : des sommes négatives (acc_i + bias_i < 0), sans saturation.
 
-    Par exemple acc = -1000 avec M = 0,005 doit donner -5. Essaie aussi un cas
-    où l'arrondi compte, comme -1 150.
+    Par exemple acc = -640 avec M = 2^-7 doit donner -5. Et la troncature va
+    vers -inf : -736 (soit -5,75) donne -6.
     """
-    for acc, attendu in [(-1000, -5), (-1150, -6), (-1049, -5), (0, 0)]:
-        obtenu, ref = await requantifier(dut, acc, 0, 0.005, zp=0)
+    for acc, attendu in [(-640, -5), (-736, -6), (-671, -6), (0, 0)]:
+        obtenu, ref = await requantifier(dut, acc, 0, 2 ** -7, zp=0)
         assert ref == attendu, "le modèle de référence lui-même est faux"
         assert obtenu == attendu, f"acc = {acc} : q_o = {obtenu}, attendu {attendu}"
     
@@ -94,11 +98,11 @@ async def test_negatifs(dut):
 async def test_saturation(dut):
     """TODO 3 : des sommes trop grandes pour un int8, dans les deux sens.
 
-    Avec M = 0,005, acc = 100 000 donnerait 500 : la sortie doit valoir 127.
+    Avec M = 2^-7, acc = 64 000 donnerait 500 : la sortie doit valoir 127.
     Et une somme très négative doit donner -128.
     """
-    for acc, attendu in [(100000, 127), (-331150, -128)]:
-        obtenu, ref = await requantifier(dut, acc, 0, 0.005, zp=0)
+    for acc, attendu in [(64000, 127), (-64000, -128)]:
+        obtenu, ref = await requantifier(dut, acc, 0, 2 ** -7, zp=0)
         assert ref == attendu, "le modèle de référence lui-même est faux"
         assert obtenu == attendu, f"acc = {acc} : q_o = {obtenu}, attendu {attendu}"
     
@@ -110,12 +114,12 @@ async def test_relu(dut):
     Avec relu=True, rien ne peut descendre sous zp : en int8, le réel 0 vaut zp.
     Prends par exemple zp = -20 et une somme négative.
     """
-    for acc, attendu in [(100000, 127), (-331150, 0),(-1000, 0), (-1150, 0), (1000, 5)]:
-        obtenu, ref = await requantifier(dut, acc, 0, 0.005, zp=0, relu=True)
+    for acc, attendu in [(64000, 127), (-64000, 0), (-640, 0), (-736, 0), (640, 5)]:
+        obtenu, ref = await requantifier(dut, acc, 0, 2 ** -7, zp=0, relu=True)
         assert ref == attendu, "le modèle de référence lui-même est faux"
         assert obtenu == attendu, f"acc = {acc} : q_o = {obtenu}, attendu {attendu}"
 
 
-    obtenu, ref = await requantifier(dut, -1000, 0, 0.005, zp=-20, relu=True)
+    obtenu, ref = await requantifier(dut, -640, 0, 2 ** -7, zp=-20, relu=True)
     assert ref == -20, "le modèle de référence lui-même est faux"
     assert obtenu == -20, f"q_o = {obtenu}, attendu -20"

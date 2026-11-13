@@ -24,7 +24,7 @@ module requant (
     always_comb begin : comb_0
         v_s        = 64'(acc_i) + 64'(bias_i);
         p_s        = v_s * 64'(m0_i);
-        r_s        = (p_s + (64'sd1 <<< (30 + shift_i))) >>> (31 + shift_i);
+        r_s        = p_s >>> (31 + shift_i);
         y_s        = r_s + 64'(zp_i);
         plancher_s = (relu_i == 1'b1) ? 64'(zp_i) : -64'sd128;
         q_o = 8'(y_s);
