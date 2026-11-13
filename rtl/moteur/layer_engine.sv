@@ -1,5 +1,8 @@
 `timescale 1ns / 1ps
 // Provenance : exercice 0006 du parcours (câblage fourni).
+// Modifié le 2026-11-13 pour le réseau réel 784 -> 512 -> 256 -> 128 -> 64 -> 10 :
+// tampon d'activations de 2 x 1 024 octets, 1 024 biais, et des poids en flux
+// (file weight_fifo) pour la couche 1, qui ne tient pas dans les BRAM.
 
 // =============================================================================
 // layer_engine.sv : une couche dense complète, d'int8 à int8, sans le banc.
@@ -15,6 +18,13 @@
 //   pose le descripteur de la couche, envoie start_i, attend done_o, puis lit
 //   les sorties par act_raddr_i / act_rdata_o.
 //
+//   Poids en flux : si w_stream_i = 1, les poids de la couche n'ont pas été
+//   chargés dans le tampon. Ils arrivent par ws_tdata_i, mot après mot, dans
+//   l'ordre où le moteur les consomme (tuile après tuile, une colonne par mot :
+//   couche_en_mots), avec la poignée de main d'AXI4-Stream (ws_tvalid_i,
+//   ws_tready_o). La file weight_fifo absorbe les trous du flux ; quand elle
+//   est vide, le séquenceur attend (une bulle).
+//
 //   Les deux petites mémoires sont des lut_ram, lues en asynchrone : x arrive
 //   au moteur dans le cycle même où le séquenceur donne son adresse. Avec une
 //   BRAM, il faudrait un étage de retard de plus sur valid (règle de la leçon 4).
@@ -23,8 +33,9 @@
 module layer_engine #(
     parameter nb_mac_g          = 8,
     parameter w_depth_g         = 32768,  // mots du tampon de poids
-    parameter act_depth_g       = 1024,   // tampon d'activations : deux zones de 512 octets
-    parameter bias_depth_g      = 512,    // un biais int32 par sortie, toutes couches confondues
+    parameter act_depth_g       = 2048,   // tampon d'activations : deux zones de 1 024 octets
+    parameter bias_depth_g      = 1024,   // un biais int32 par sortie, toutes couches confondues
+    parameter ws_depth_g        = 16,     // mots de la file des poids en flux
     parameter dim_width_g       = 10,     // n et m jusqu'à 1 023
     parameter sel_width_g       = $clog2(nb_mac_g),
     parameter w_addr_width_g    = $clog2(w_depth_g),
@@ -57,6 +68,11 @@ module layer_engine #(
     input  logic        [4:0]            shift_i,
     input  logic signed [7:0]            zp_i,
     input  logic                         relu_i,
+    input  logic                         w_stream_i,   // 1 : les poids de la couche arrivent en flux
+    // Le flux de poids (AXI4-Stream ; plus tard, l'AXI DMA)
+    input  logic [nb_mac_g*8-1:0]        ws_tdata_i,
+    input  logic                         ws_tvalid_i,
+    output logic                         ws_tready_o,
     // Commande
     input  logic                         start_i,
     output logic                         busy_o,
@@ -73,6 +89,11 @@ module layer_engine #(
     logic                         seq_we_s;
     logic [act_addr_width_g-1:0]  seq_waddr_s;
     logic                         busy_s;
+    logic                         ws_pop_s;   // le séquenceur prend un mot du flux
+
+    // Le flux de poids, à la sortie de sa file
+    logic [nb_mac_g*8-1:0]        ws_data_s;
+    logic                         ws_valid_s;
 
     // Chemin de données
     logic [nb_mac_g*32-1:0]       acc_s;      // les P accumulateurs du moteur de passe
@@ -107,6 +128,9 @@ module layer_engine #(
         .in_base_i   (in_base_i),
         .out_base_i  (out_base_i),
         .bias_base_i (bias_base_i),
+        .stream_i    (w_stream_i),
+        .ws_valid_i  (ws_valid_s),
+        .ws_pop_o    (ws_pop_s),
         .clear_o     (clear_s),
         .base_o      (base_s),
         .valid_o     (valid_s),
@@ -136,7 +160,26 @@ module layer_engine #(
         .base_i  (base_s),
         .valid_i (valid_s),
         .x_i     (x_s),
+        .stream_i (w_stream_i),
+        .ws_data_i(ws_data_s),
         .acc_o   (acc_s)
+    );
+
+    // -------------------------------------------------------------------------
+    // Les poids en flux : une petite file entre le flux et le moteur de passe.
+    // -------------------------------------------------------------------------
+    weight_fifo #(
+        .width_g(nb_mac_g*8),
+        .depth_g(ws_depth_g)
+    ) u_flux (
+        .clock_i   (clock_i),
+        .resetb_i  (resetb_i),
+        .s_tdata_i (ws_tdata_i),
+        .s_tvalid_i(ws_tvalid_i),
+        .s_tready_o(ws_tready_o),
+        .m_data_o  (ws_data_s),
+        .m_valid_o (ws_valid_s),
+        .pop_i     (ws_pop_s)
     );
 
     // -------------------------------------------------------------------------

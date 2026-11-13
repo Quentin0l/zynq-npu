@@ -22,6 +22,8 @@ module pass_engine #(
     input  logic [addr_width_g-1:0]         base_i,
     input  logic                            valid_i,
     input  logic signed [7:0]               x_i,
+    input  logic                            stream_i,
+    input  logic [nb_mac_g*8-1:0]           ws_data_i,
     // Résultats : un champ de acc_width_g bits par MAC
     output logic [nb_mac_g*acc_width_g-1:0] acc_o
 );
@@ -31,6 +33,9 @@ module pass_engine #(
     logic signed [7:0]       x_d_s;
     logic                    valid_d_s;
     logic                    clear_d_s;
+    logic [nb_mac_g*8-1:0]   ws_d_s;
+    logic                    stream_d_s;
+    logic [nb_mac_g*8-1:0]   w_row_s;
 
     always_ff @(posedge clock_i or negedge resetb_i) begin : seq_0
         if (resetb_i == 1'b0)
@@ -46,11 +51,15 @@ module pass_engine #(
             x_d_s     <= '0;
             valid_d_s <= 1'b0;
             clear_d_s <= 1'b0;
+            ws_d_s     <= '0;
+            stream_d_s <= 1'b0;
         end : raz
         else begin : retard
             x_d_s     <= x_i;
             valid_d_s <= valid_i;
             clear_d_s <= clear_i;
+            ws_d_s     <= ws_data_i;
+            stream_d_s <= stream_i;
         end : retard
     end : seq_1
 
@@ -66,6 +75,8 @@ module pass_engine #(
         .rdata_o(rdata_s)
     );
 
+    assign w_row_s = (stream_d_s == 1'b1) ? ws_d_s : rdata_s;
+
     mac_row #(
         .nb_mac_g   (nb_mac_g),
         .acc_width_g(acc_width_g)
@@ -75,7 +86,7 @@ module pass_engine #(
         .clear_i (clear_d_s),
         .valid_i (valid_d_s),
         .x_i     (x_d_s),
-        .w_i     (rdata_s),
+        .w_i     (w_row_s),
         .acc_o   (acc_o)
     );
 

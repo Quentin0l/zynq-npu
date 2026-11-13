@@ -56,7 +56,8 @@ def nb_mac(dut):
 async def demarrer(dut):
     Clock(dut.clock_i, 10, "ns").start()
     for sig in (dut.resetb_i, dut.we_i, dut.waddr_i, dut.wdata_i,
-                dut.clear_i, dut.base_i, dut.valid_i, dut.x_i):
+                dut.clear_i, dut.base_i, dut.valid_i, dut.x_i,
+                dut.stream_i, dut.ws_data_i):
         sig.value = 0
     for _ in range(2):
         await RisingEdge(dut.clock_i)
@@ -198,5 +199,35 @@ async def test_premiere_couche(dut):
     await charger(dut, tuile_en_mots(W), base=0)
     await debut_passe(dut, base=0)
     await entrees(dut, x)
+    y = await lire_sorties(dut)
+    assert y == gemv_ref(W, x), f"sorties {y}, attendu {gemv_ref(W, x)}"
+
+
+# ---------------------------------------------------------------------------
+# Ajouté le 2026-11-13 : les poids en flux (E6), pour la couche 1 du réseau réel.
+# ---------------------------------------------------------------------------
+@cocotb.test
+async def test_poids_en_flux(dut):
+    """E6 : stream_i = 1, chaque poids arrive par ws_data_i, avec son x, sans passer
+    par le tampon (qui contient d'autres poids). Une bulle au milieu ne change rien."""
+    await demarrer(dut)
+    P, n = nb_mac(dut), 16
+    W = [[random.randint(-128, 127) for _ in range(n)] for _ in range(P)]
+    x = [random.randint(-128, 127) for _ in range(n)]
+    leurre = [[random.randint(-128, 127) for _ in range(n)] for _ in range(P)]
+    await charger(dut, tuile_en_mots(leurre), base=0)     # le tampon ne doit pas servir
+    mots = tuile_en_mots(W)
+    dut.stream_i.value = 1
+    await debut_passe(dut, base=0)
+    for j, v in enumerate(x):
+        if j == n // 2:                                   # une bulle : rien ne doit s'accumuler
+            dut.valid_i.value = 0
+            dut.ws_data_i.value = 0
+            await RisingEdge(dut.clock_i)
+        dut.x_i.value = v
+        dut.ws_data_i.value = mots[j]
+        dut.valid_i.value = 1
+        await RisingEdge(dut.clock_i)
+    dut.valid_i.value = 0
     y = await lire_sorties(dut)
     assert y == gemv_ref(W, x), f"sorties {y}, attendu {gemv_ref(W, x)}"

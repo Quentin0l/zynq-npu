@@ -23,6 +23,9 @@ module layer_seq #(
     input  logic [act_addr_width_g-1:0]  in_base_i,    // zone des entrées, dans le tampon d'activations
     input  logic [act_addr_width_g-1:0]  out_base_i,   // zone des sorties
     input  logic [bias_addr_width_g-1:0] bias_base_i,  // premier biais de la couche
+    input  logic                         stream_i,
+    input  logic                         ws_valid_i,
+    output logic                         ws_pop_o,
     // Commandes du moteur de passe (exercice 0004)
     output logic                         clear_o,
     output logic [w_addr_width_g-1:0]    base_o,
@@ -49,6 +52,7 @@ module layer_seq #(
     logic [sel_width_g-1:0]    k_s;      // boucle sur les P MAC à vider
     logic [dim_width_g-1:0]    o_s;      // numéro de la sortie, de 0 à m - 1, sur toute la couche
     logic [w_addr_width_g-1:0] wbase_s;  // adresse de la tuile de la passe suivante
+    logic                      avance_s;
 
     // -------------------------------------------------------------------------
     // Registre d'état (fourni).
@@ -71,7 +75,7 @@ module layer_seq #(
             CLEAR:
                 next_state_s = STREAM;
             STREAM:
-                if (j_s == n_i - 1'b1) next_state_s = WAIT;
+                if (j_s == n_i - 1'b1 && avance_s == 1'b1) next_state_s = WAIT;
                 else                   next_state_s = STREAM;
             WAIT:
                 next_state_s = DRAIN;
@@ -109,7 +113,7 @@ module layer_seq #(
                     wbase_s <= wbase_s + w_addr_width_g'(n_i);
                 end : prepare_passe
                 STREAM:
-                    j_s <= j_s + 1'b1;
+                    if (avance_s == 1'b1) j_s <= j_s + 1'b1;
                 DRAIN: begin : vide
                     k_s <= k_s + 1'b1;
                     o_s <= o_s + 1'b1;
@@ -131,12 +135,15 @@ module layer_seq #(
         case (current_state_s)
             IDLE:    busy_o   = 1'b0;
             CLEAR:   clear_o  = 1'b1;
-            STREAM:  valid_o  = 1'b1;
+            STREAM:  valid_o  = avance_s;
             DRAIN:   act_we_o = 1'b1;
             DONE:    done_o   = 1'b1;
             default: ;  // WAIT : rien
         endcase
     end : comb_1
+
+    assign avance_s = (stream_i == 1'b0) || (ws_valid_i == 1'b1);
+    assign ws_pop_o = (current_state_s == STREAM) && (stream_i == 1'b1) && (ws_valid_i == 1'b1);
 
     // Les adresses : une base du descripteur plus un compteur.
     assign base_o       = wbase_s;

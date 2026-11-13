@@ -61,7 +61,8 @@ SUITES = {
     "couche": dict(
         top="layer_engine", tests="test_layer",
         sources=[MOTEUR + f for f in ("mac.sv", "mac_row.sv", "weight_buffer.sv", "pass_engine.sv",
-                                      "requant.sv", "lut_ram.sv", "layer_seq.sv", "layer_engine.sv")],
+                                      "requant.sv", "lut_ram.sv", "weight_fifo.sv", "layer_seq.sv",
+                                      "layer_engine.sv")],
         mutants=(MOTEUR + "layer_seq.sv", "tb/mutants/layer_seq/mutant_*.sv"),
     ),
     # NPU v2 : le tableau systolique 8 × 8 (leçon 8).

@@ -1,5 +1,6 @@
 `timescale 1ns / 1ps
 // Provenance : exercice 0006 du parcours (spécification, seq_0 et comb_1 fournis ; transitions et compteurs écrits par l'auteur du dépôt).
+// Modifié le 2026-11-13 : S3 en mode flux, pour les poids de la couche 1 du réseau réel.
 
 // =============================================================================
 // layer_seq.sv : le séquenceur. Il exécute UNE couche dense entière, seul :
@@ -19,6 +20,10 @@
 //                wbase <- wbase + n_i (la tuile suivante). -> STREAM.
 //   S3. STREAM : n_i cycles. valid_o = 1, act_raddr_o = in_base_i + j.
 //                j <- j + 1. Si j = n_i - 1 (dernière entrée) : -> WAIT.
+//                En mode flux (stream_i = 1), le poids de l'entrée j vient
+//                d'un flux, dont ws_valid_i dit qu'un mot est prêt. STREAM
+//                n'avance que dans ce cas : valid_o = 1, ws_pop_o = 1, j <- j + 1.
+//                Sinon, c'est une bulle : valid_o = 0, et rien ne bouge.
 //   S4. WAIT   : 1 cycle, aucun compteur ne bouge. Le moteur de passe retarde
 //                tout d'un cycle (E5 de l'exercice 0004) : c'est pendant ce
 //                cycle que le dernier produit entre dans les accumulateurs.
@@ -30,7 +35,8 @@
 //                Sinon : on reste en DRAIN.
 //   S6. DONE   : 1 cycle. done_o = 1. -> IDLE.
 //   busy_o = 1 dans tous les états sauf IDLE.
-//   Durée : de CLEAR (inclus) à DONE (exclu), T·(n + 2) + m cycles.
+//   Durée : de CLEAR (inclus) à DONE (exclu), T·(n + 2) + m cycles,
+//   plus une par bulle en mode flux.
 //   Le descripteur (n_i, m_i et les bases) reste stable de start_i à done_o.
 // =============================================================================
 
@@ -52,6 +58,10 @@ module layer_seq #(
     input  logic [act_addr_width_g-1:0]  in_base_i,    // zone des entrées, dans le tampon d'activations
     input  logic [act_addr_width_g-1:0]  out_base_i,   // zone des sorties
     input  logic [bias_addr_width_g-1:0] bias_base_i,  // premier biais de la couche
+    input  logic                         stream_i,     // 1 : les poids de la couche arrivent en flux
+    // Le flux de poids (mode flux)
+    input  logic                         ws_valid_i,   // un mot du flux est prêt
+    output logic                         ws_pop_o,     // ce mot est pris à ce front
     // Commandes du moteur de passe (exercice 0004)
     output logic                         clear_o,
     output logic [w_addr_width_g-1:0]    base_o,
@@ -67,7 +77,8 @@ module layer_seq #(
     output logic                         done_o
 );
 
-    // FSM_Moore : les commandes ne dépendent que de l'état et des compteurs.
+    // FSM_Moore : les commandes ne dépendent que de l'état et des compteurs,
+    // sauf en mode flux, où valid_o et ws_pop_o suivent aussi ws_valid_i (Mealy).
     // (Les bases du descripteur, ajoutées aux compteurs pour former les adresses,
     // sont des constantes pendant toute la couche.)
     typedef enum logic [2:0] {IDLE, CLEAR, STREAM, WAIT, DRAIN, DONE} state_t;
@@ -78,6 +89,7 @@ module layer_seq #(
     logic [sel_width_g-1:0]    k_s;      // boucle sur les P MAC à vider
     logic [dim_width_g-1:0]    o_s;      // numéro de la sortie, de 0 à m - 1, sur toute la couche
     logic [w_addr_width_g-1:0] wbase_s;  // adresse de la tuile de la passe suivante
+    logic                      avance_s; // STREAM avance : hors flux, ou un mot du flux est prêt
 
     // -------------------------------------------------------------------------
     // Registre d'état (fourni).
@@ -104,7 +116,7 @@ module layer_seq #(
     case(current_state_s)
         IDLE: next_state_s = (start_i == 1'b1)? CLEAR : IDLE;
         CLEAR: next_state_s = STREAM;
-        STREAM: next_state_s = (j_s == n_i - 1'b1)? WAIT : STREAM;
+        STREAM: next_state_s = (j_s == n_i - 1'b1 && avance_s == 1'b1)? WAIT : STREAM;
         WAIT: next_state_s = DRAIN;
         DRAIN: if (o_s == m_i - 1'b1 )
                     next_state_s = DONE;
@@ -140,7 +152,7 @@ module layer_seq #(
                     wbase_s <= wbase_s + n_i;
 
                 end
-                STREAM: j_s <= j_s + 1'b1;
+                STREAM: if (avance_s == 1'b1) j_s <= j_s + 1'b1;
                 DRAIN: begin
                         k_s <= k_s + 1'b1;
                         o_s <= o_s + 1'b1;
@@ -165,12 +177,16 @@ module layer_seq #(
         case (current_state_s)
             IDLE:    busy_o   = 1'b0;
             CLEAR:   clear_o  = 1'b1;
-            STREAM:  valid_o  = 1'b1;
+            STREAM:  valid_o  = avance_s;
             DRAIN:   act_we_o = 1'b1;
             DONE:    done_o   = 1'b1;
             default: ;  // WAIT : rien
         endcase
     end : comb_1
+
+    // Le mode flux (S3).
+    assign avance_s = (stream_i == 1'b0) || (ws_valid_i == 1'b1);
+    assign ws_pop_o = (current_state_s == STREAM) && (stream_i == 1'b1) && (ws_valid_i == 1'b1);
 
     // Les adresses : une base du descripteur plus un compteur.
     assign base_o       = wbase_s;

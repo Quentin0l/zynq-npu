@@ -1,5 +1,6 @@
 `timescale 1ns / 1ps
 // Provenance : exercice 0004 du parcours (spécification fournie, TODO écrits par l'auteur du dépôt).
+// Modifié le 2026-11-13 : E6, les poids peuvent arriver en flux (couche 1 du réseau réel).
 
 // =============================================================================
 // pass_engine.sv : ta rangée de MAC, nourrie par son tampon de poids.
@@ -18,6 +19,10 @@
 //   E5. Latence : le tampon rend un mot UN cycle après son adresse. x_i, valid_i
 //       et clear_i doivent donc arriver à la rangée avec un cycle de retard, eux
 //       aussi : tout ce qui accompagne une donnée prend le même retard qu'elle.
+//   E6. Poids en flux : si stream_i = 1, le poids de l'entrée x_i vient de
+//       ws_data_i, présenté dans le même cycle que x_i et valid_i, au lieu du
+//       tampon. Il prend le même cycle de retard (E5). stream_i reste stable
+//       pendant toute une passe.
 //   La rangée est ton mac_row.sv de l'exercice 0003, réutilisé tel quel.
 // =============================================================================
 
@@ -38,6 +43,9 @@ module pass_engine #(
     input  logic [addr_width_g-1:0]         base_i,
     input  logic                            valid_i,
     input  logic signed [7:0]               x_i,
+    // Poids en flux (E6)
+    input  logic                            stream_i,   // 1 : le poids vient de ws_data_i
+    input  logic [nb_mac_g*8-1:0]           ws_data_i,  // le mot de poids, avec x_i et valid_i
     // Résultats : un champ de acc_width_g bits par MAC
     output logic [nb_mac_g*acc_width_g-1:0] acc_o
 );
@@ -48,6 +56,9 @@ module pass_engine #(
     logic signed [7:0]       x_d_s;      // x_i retardé d'un cycle
     logic                    valid_d_s;  // valid_i retardé d'un cycle
     logic                    clear_d_s;  // clear_i retardé d'un cycle
+    logic [nb_mac_g*8-1:0]   ws_d_s;     // ws_data_i retardé d'un cycle (E6)
+    logic                    stream_d_s; // stream_i retardé d'un cycle (E6)
+    logic [nb_mac_g*8-1:0]   w_row_s;    // le mot de poids que reçoit la rangée
 
     // -------------------------------------------------------------------------
     // TODO 1a : le compteur d'adresse raddr_s, dans un processus seq_0
@@ -76,11 +87,15 @@ module pass_engine #(
             x_d_s <= '0;
             valid_d_s<= '0;
             clear_d_s <= '0;
+            ws_d_s <= '0;
+            stream_d_s <= 1'b0;
         end : raz
         else begin : retard
             x_d_s <= x_i;   // à chaque front, sans condition : x_d_s vaudra au cycle suivant ce que x_i vaut maintenant
             valid_d_s <= valid_i;
             clear_d_s <= clear_i;
+            ws_d_s <= ws_data_i;    // E6 : le mot du flux prend le même retard que x
+            stream_d_s <= stream_i;
         end : retard
     end : seq_1
     
@@ -98,6 +113,9 @@ weight_buffer #(
 );
 
 
+// E6 : la rangée reçoit le mot du tampon, ou celui du flux.
+assign w_row_s = (stream_d_s == 1'b1) ? ws_d_s : rdata_s;
+
 mac_row #(
     .nb_mac_g   (nb_mac_g),
     .acc_width_g(acc_width_g)
@@ -107,7 +125,7 @@ mac_row #(
     .clear_i(clear_d_s),
     .valid_i(valid_d_s),
     .x_i(x_d_s),
-    .w_i(rdata_s),
+    .w_i(w_row_s),
     .acc_o(acc_o)
 
 );

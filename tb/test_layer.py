@@ -11,13 +11,13 @@ from dataclasses import dataclass
 
 import cocotb
 from cocotb.clock import Clock
-from cocotb.triggers import RisingEdge, Timer
+from cocotb.triggers import FallingEdge, RisingEdge, Timer
 
 # Le modèle de référence partagé : tb/modele_npu.py
 from modele_npu import (couche_aleatoire, couche_en_mots, couche_ref,
                         echelle_type, multiplicateur)
 
-ZONE_A, ZONE_B = 0, 512  # les deux zones du tampon d'activations
+ZONE_A, ZONE_B = 0, 1024  # les deux zones du tampon d'activations (2 x 1 024 octets)
 
 
 # ---------------------------------------------------------------------------
@@ -35,6 +35,7 @@ class Couche:
     bias_base: int   # adresse de son premier biais
     in_base: int     # zone de ses entrées dans le tampon d'activations
     out_base: int    # zone de ses sorties
+    flux: bool = False  # True : ses poids arrivent en flux (ws_tdata_i), pas du tampon
 
     @property
     def n(self):
@@ -68,7 +69,7 @@ async def demarrer(dut):
                 dut.act_we_i, dut.act_waddr_i, dut.act_wdata_i, dut.act_raddr_i,
                 dut.n_i, dut.m_i, dut.w_base_i, dut.bias_base_i, dut.in_base_i,
                 dut.out_base_i, dut.m0_i, dut.shift_i, dut.zp_i, dut.relu_i,
-                dut.start_i):
+                dut.w_stream_i, dut.ws_tdata_i, dut.ws_tvalid_i, dut.start_i):
         sig.value = 0
     for _ in range(2):
         await RisingEdge(dut.clock_i)
@@ -107,6 +108,24 @@ async def lire_activations(dut, base, nb):
     return y
 
 
+async def pousser_flux(dut, mots, trou=0.0):
+    """Pousse les mots de poids dans le flux (ws_tdata_i), avec la poignée de main
+    d'AXI4-Stream. Avant chaque mot, avec la probabilité trou, un cycle sans rien
+    (ws_tvalid_i = 0) : c'est un DMA irrégulier. Comme pour le maître AXI, le
+    pilote agit au front descendant ; ws_tready_o ne dépend que de bascules."""
+    for mot in mots:
+        await FallingEdge(dut.clock_i)
+        while random.random() < trou:
+            dut.ws_tvalid_i.value = 0
+            await FallingEdge(dut.clock_i)
+        dut.ws_tdata_i.value = mot
+        dut.ws_tvalid_i.value = 1
+        while dut.ws_tready_o.value != 1:    # le transfert aura lieu au prochain front ssi tready = 1
+            await FallingEdge(dut.clock_i)
+        await RisingEdge(dut.clock_i)        # le mot entre dans la file à ce front
+        dut.ws_tvalid_i.value = 0
+
+
 async def executer(dut, c):
     """Pose le descripteur de c, envoie start_i, attend done_o, puis le retour en IDLE.
 
@@ -118,6 +137,7 @@ async def executer(dut, c):
     dut.in_base_i.value, dut.out_base_i.value = c.in_base, c.out_base
     dut.m0_i.value, dut.shift_i.value = m0, n
     dut.zp_i.value, dut.relu_i.value = c.zp, int(c.relu)
+    dut.w_stream_i.value = int(c.flux)
     dut.start_i.value = 1
     await RisingEdge(dut.clock_i)          # ce front voit start_i = 1 : IDLE -> CLEAR
     dut.start_i.value = 0
@@ -268,3 +288,52 @@ async def test_mlp_complet(dut):
         y = await lire_activations(dut, c.out_base, c.m)    # relire ne modifie rien
         assert y == attendu, f"couche {numero} : sorties {y[:8]}..., attendu {attendu[:8]}..."
         assert cycles == duree(c, P), f"couche {numero} : {cycles} cycles au lieu de {duree(c, P)}"
+
+
+
+# ---------------------------------------------------------------------------
+# Ajouté le 2026-11-13 : les poids en flux, pour la couche 1 du réseau réel
+# (784 -> 512), qui ne tient pas dans les BRAM.
+# ---------------------------------------------------------------------------
+@cocotb.test
+async def test_couche_en_flux(dut):
+    """Une couche dont les poids arrivent en flux, sans trou : même résultat et même
+    durée que depuis le tampon. Le tampon contient des leurres, qui ne doivent pas servir."""
+    await demarrer(dut)
+    P = nb_mac(dut)
+    W, b = couche_aleatoire(16, P + 2)
+    c = Couche(W, b, M=echelle_type(16), zp=-3, relu=False,
+               w_base=0, bias_base=0, in_base=ZONE_A, out_base=ZONE_B, flux=True)
+    leurres, _ = couche_aleatoire(16, P + 2)
+    await ecrire(dut, dut.w_we_i, dut.w_waddr_i, dut.w_wdata_i, couche_en_mots(leurres, P), 0)
+    await ecrire(dut, dut.bias_we_i, dut.bias_waddr_i, dut.bias_wdata_i, c.b, c.bias_base)
+    x = [random.randint(-128, 127) for _ in range(c.n)]
+    await ecrire_activations(dut, x, c.in_base)
+
+    cocotb.start_soon(pousser_flux(dut, couche_en_mots(c.W, P)))
+    cycles = await executer(dut, c)
+    y = await lire_activations(dut, c.out_base, c.m)
+
+    assert y == c.ref(x), f"sorties {y}, attendu {c.ref(x)}"
+    assert cycles == duree(c, P), f"{cycles} cycles au lieu de {duree(c, P)} : le flux a-t-il fait attendre ?"
+
+
+@cocotb.test
+async def test_flux_avec_trous(dut):
+    """Un flux irrégulier : un mot sur deux en moyenne. La file se vide, le séquenceur
+    attend (des bulles), et le résultat ne change pas."""
+    await demarrer(dut)
+    P = nb_mac(dut)
+    W, b = couche_aleatoire(48, P + 2)          # 48 mots par passe : plus que la file n'en garde
+    c = Couche(W, b, M=echelle_type(48), zp=-3, relu=False,
+               w_base=0, bias_base=0, in_base=ZONE_A, out_base=ZONE_B, flux=True)
+    await ecrire(dut, dut.bias_we_i, dut.bias_waddr_i, dut.bias_wdata_i, c.b, c.bias_base)
+    x = [random.randint(-128, 127) for _ in range(c.n)]
+    await ecrire_activations(dut, x, c.in_base)
+
+    cocotb.start_soon(pousser_flux(dut, couche_en_mots(c.W, P), trou=0.5))
+    cycles = await executer(dut, c)
+    y = await lire_activations(dut, c.out_base, c.m)
+
+    assert y == c.ref(x), f"sorties {y}, attendu {c.ref(x)}"
+    assert cycles > duree(c, P), f"{cycles} cycles : aucune bulle, le flux n'a pas été mis à l'épreuve"
