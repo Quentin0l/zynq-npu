@@ -21,3 +21,7 @@ ref/test_gemm.dSYM/
 # OpenCL
 opencl/build/
 opencl/build.log
+
+#vivado
+hw/build
+hw/sim/build
