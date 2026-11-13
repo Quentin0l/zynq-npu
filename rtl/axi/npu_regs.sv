@@ -130,8 +130,36 @@ module npu_regs #(
     //          (always_comb) : un case sur rd_mot_s, avec un default, selon R1 à R4.
     // Supprime les trois lignes « assign … » ci-dessous.
     // -------------------------------------------------------------------------
-    assign scratch_s = '0;
-    assign cycles_s  = '0;
-    assign lecture_s = '0;
+    always_ff @(posedge clock_i or negedge resetb_i) begin : seq_s
+        if (resetb_i == 1'b0) begin : res
+            scratch_s <= '0;
+        end : res
+        else if (wr_go_s && wr_mot_s == scratch_p) begin : ecriture
+            for (int b = 0; b < 4; b++) begin
+                if (wstrb_i[b]) begin
+                    scratch_s[8*b +: 8] <= wdata_i[8*b +: 8];
+                end
+            end
+        end : ecriture
+    end : seq_s
+
+    always_ff @(posedge clock_i or negedge resetb_i) begin : seq_cycles
+        if (resetb_i == 1'b0) begin : res
+            cycles_s <= '0;
+        end : res
+        else begin : incrementation
+            cycles_s <= cycles_s + 1;
+        end : incrementation
+    end : seq_cycles
+
+
+    always_comb begin : comb_lecture
+        case (rd_mot_s)
+            version_p: lecture_s = version_g;
+            scratch_p: lecture_s = scratch_s;
+            cycles_p : lecture_s = cycles_s;
+            default  : lecture_s = '0;
+        endcase
+    end : comb_lecture
 
 endmodule : npu_regs
