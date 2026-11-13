@@ -20,10 +20,10 @@ flowchart LR
 
 **v1, le moteur matrice-vecteur** (`rtl/moteur/`). C'est une rangée de P MAC int8 → int32, output-stationary, avec :
 - un tampon de poids en BRAM, dont chaque mot donne un poids à chaque MAC ;
-- une unité de requantification int32 → int8, ReLU comprise ;
+- une unité de requantification int32 → int8, ReLU comprise, qui tronque comme AIfES ;
 - un séquenceur, une machine d'états qui exécute seule une couche entière, passe après passe.
 
-Chaque brique a son banc cocotb et ses mutants. En simulation, le moteur exécute un MLP complet, 512 → 256 → 128 → 64 → 10, d'int8 à int8, sans que le banc intervienne entre deux couches.
+Chaque brique a son banc cocotb et ses mutants. En simulation, le moteur exécute le vrai réseau de l'auteur, un MLP MNIST 784 → 512 → 256 → 128 → 64 → 10 quantifié par AIfES, sans que le banc intervienne entre deux couches. Ses 10 logits sont ceux d'AIfES, au bit près (`tb/test_reseau.py`). Les 574 080 poids dépassent les BRAM du XC7Z020 : ceux de la couche 1 arrivent en flux, comme ils viendront de la DDR par DMA.
 
 **v2, le tableau systolique 8 × 8** (`rtl/tableau/`). Il calcule un GEMM par tuiles de 8 × 8, avec 64 MAC et des données qui ne voyagent qu'entre PE voisins. Le PE et le tableau existent déjà ; le décalage d'entrée et le contrôleur sont en cours. Il se branchera derrière le même contrat d'interface que la v1.
 

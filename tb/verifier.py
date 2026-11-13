@@ -65,6 +65,14 @@ SUITES = {
                                       "layer_engine.sv")],
         mutants=(MOTEUR + "layer_seq.sv", "tb/mutants/layer_seq/mutant_*.sv"),
     ),
+    # Le réseau réel (AIfES Q7, MNIST) sur le NPU v1, de bout en bout : pas de mutants,
+    # c'est un test de recette, plus lent (couche 1 en flux, 4 images).
+    "reseau": dict(
+        top="layer_engine", tests="test_reseau",
+        sources=[MOTEUR + f for f in ("mac.sv", "mac_row.sv", "weight_buffer.sv", "pass_engine.sv",
+                                      "requant.sv", "lut_ram.sv", "weight_fifo.sv", "layer_seq.sv",
+                                      "layer_engine.sv")],
+    ),
     # NPU v2 : le tableau systolique 8 × 8 (leçon 8).
     "skew": dict(
         top="skew", tests="test_skew",
@@ -86,7 +94,7 @@ SUITES = {
 
 # Des groupes, pour lancer une version du NPU d'un coup : ./check.sh v1
 GROUPES = {
-    "v1": ["mac", "rangee", "passe", "requant", "couche"],
+    "v1": ["mac", "rangee", "passe", "requant", "couche", "reseau"],
     "v2": ["skew", "tableau", "tuile"],
 }
 

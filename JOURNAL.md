@@ -26,6 +26,14 @@ Deux semaines, jusqu'au 23 octobre, pour une troisième cible du même GEMM : Op
 
 **Une mesure à ne pas croire.** Sur le GPU d'Apple, les compteurs de profiling d'OpenCL donnaient des durées environ 50 fois trop courtes, donc des dizaines de milliers de Gop/s. Le banc mesure désormais avec l'horloge de l'hôte.
 
+## 13 novembre : le vrai réseau sur le NPU
+
+Le réseau des leçons n'était pas le bon. Le MLP réel, exporté par AIfES, est **784 → 512 → 256 → 128 → 64 → 10** : il a une couche de plus en tête, et cette couche porte 70 % des poids. Ses 574 080 poids int8 dépassent toutes les BRAM du XC7Z020 (573 440 octets). Un décodage du fichier d'AIfES et une simulation au bit près sur les 10 000 images de test de MNIST ont tranché trois questions :
+
+- **La quantification d'AIfES colle au NPU** : poids symétriques, biais int32, échelles en puissances de deux, ReLU au point zéro. Une seule différence : AIfES décale sans arrondir. **Décision** : le NPU tronque comme AIfES. Il donne alors les mêmes logits au bit près, pour une précision de 97,85 %, contre 98,07 % avec l'arrondi, qui ne reproduisait jamais AIfES.
+- **Décision** : la couche 1 arrive **en flux** depuis la DDR, et les couches 2 à 5 restent en BRAM (43 blocs avec P = 8). Le moteur prend désormais ses poids dans une file `weight_fifo`, alimentée façon AXI4-Stream ; le vrai DMA viendra en S3. Avec P = 8 à 100 MHz, le flux demande 800 Mo/s, sous les 1 200 Mo/s théoriques d'un port AXI_HP.
+- **Décision** : les poids entrent dans le dépôt, avec 4 images MNIST. `tb/check.sh v1` vérifie maintenant le réseau entier : 73 022 cycles par image, soit 730 µs à 100 MHz.
+
 ## S2 à S8
 
 Les tâches sont dans les jalons [S2](https://github.com/Quentin0l/zynq-npu/milestone/2), [S3](https://github.com/Quentin0l/zynq-npu/milestone/3), [S4](https://github.com/Quentin0l/zynq-npu/milestone/4), [S5](https://github.com/Quentin0l/zynq-npu/milestone/5), [S6](https://github.com/Quentin0l/zynq-npu/milestone/6), [S7](https://github.com/Quentin0l/zynq-npu/milestone/7) et [S8](https://github.com/Quentin0l/zynq-npu/milestone/8). Chaque section s'ouvre ici le lundi de sa semaine. La v2 a son issue à part, sans jalon : [#34](https://github.com/Quentin0l/zynq-npu/issues/34).
