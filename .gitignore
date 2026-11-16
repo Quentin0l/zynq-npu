@@ -25,3 +25,16 @@ opencl/build.log
 #vivado
 hw/build
 hw/sim/build
+
+
+sw/*
+!sw/build_sw.py
+!sw/npu_hello/
+sw/npu_hello/*
+!sw/npu_hello/src/
+sw/npu_hello/src/*
+!sw/npu_hello/src/*.c
+!sw/npu_hello/src/*.h
+
+vivado*.jou
+vivado*.log
