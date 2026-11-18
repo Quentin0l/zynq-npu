@@ -26,15 +26,19 @@ opencl/build.log
 hw/build
 hw/sim/build
 
-
+# Vitis : le workspace se régénère depuis le XSA. On ne garde que les sources
+# des applications et le script.
 sw/*
 !sw/build_sw.py
-!sw/npu_hello/
-sw/npu_hello/*
-!sw/npu_hello/src/
-sw/npu_hello/src/*
-!sw/npu_hello/src/*.c
-!sw/npu_hello/src/*.h
+!sw/*/
+sw/*/*
+!sw/*/src/
+sw/*/src/*
+!sw/*/src/*.c
+!sw/*/src/*.h
+
+
+
 
 vivado*.jou
 vivado*.log

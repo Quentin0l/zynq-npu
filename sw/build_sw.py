@@ -1,4 +1,4 @@
-# build_sw.py : reconstruit la plateforme et l'application depuis git, dans un
+# build_sw.py : reconstruit la plateforme et les applications depuis git, dans un
 # workspace jetable (sw/ci), pour vérifier que tout compile.
 # Lancer depuis la racine du dépôt :  vitis -s sw/build_sw.py
 import os
@@ -19,11 +19,13 @@ plateforme = client.create_platform_component(
     cpu="ps7_cortexa9_0", domain_name="standalone_ps7_cortexa9_0")
 plateforme.build()
 
-# 2. L'application : vide, plus les sources du dépôt.
-app = client.create_app_component(
-    name="npu_hello", platform=client.find_platform_in_repos("zed_npu"),
-    domain="standalone_ps7_cortexa9_0", template="empty_application")
-app.import_files(from_loc=os.path.join(sw, "npu_hello", "src"), files=["main.c"])
-app.build()
+# 2. Les applications : chacune vide, plus ses sources du dépôt.
+APPLICATIONS = ("npu_hello", "npu_dma")
+for nom in APPLICATIONS:
+    app = client.create_app_component(
+        name=nom, platform=client.find_platform_in_repos("zed_npu"),
+        domain="standalone_ps7_cortexa9_0", template="empty_application")
+    app.import_files(from_loc=os.path.join(sw, nom, "src"), files=["main.c"])
+    app.build()
 
 vitis.dispose()
