@@ -42,3 +42,5 @@ sw/*/src/*
 
 vivado*.jou
 vivado*.log
+# Constructions jetables hors des workspaces (build_sw.py)
+build/

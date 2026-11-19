@@ -1,12 +1,12 @@
 # build_sw.py : reconstruit la plateforme et les applications depuis git, dans un
-# workspace jetable (sw/ci), pour vérifier que tout compile.
+# workspace jetable (build/sw_ci), pour vérifier que tout compile.
 # Lancer depuis la racine du dépôt :  vitis -s sw/build_sw.py
 import os
 import shutil
 import vitis
 
 sw = os.path.dirname(os.path.abspath(__file__))
-ws = os.path.join(sw, "ci")
+ws = os.path.normpath(os.path.join(sw, "..", "build", "sw_ci"))   # hors de sw/ : Vitis ne le voit pas
 xsa = os.path.normpath(os.path.join(sw, "..", "hw", "build", "system.xsa"))
 shutil.rmtree(ws, ignore_errors=True)
 
