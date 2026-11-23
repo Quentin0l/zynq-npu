@@ -4,9 +4,9 @@ Un NPU int8 en SystemVerilog, et le compilateur qui le programme, sur ZedBoard (
 
 [![CI](https://github.com/Quentin0l/zynq-npu/actions/workflows/ci.yml/badge.svg)](https://github.com/Quentin0l/zynq-npu/actions/workflows/ci.yml)
 
-**Aujourd'hui, le NPU v1 exécute sur la carte le réseau MNIST entier** (784 → 512 → 256 → 128 → 64 → 10, quantifié par AIfES), et ses logits sont ceux d'AIfES au bit près. La suite du projet, jusqu'au 13 décembre 2026, construit la chaîne logicielle qui le programme, puis met le tableau systolique sur la carte à côté de lui.
+**Aujourd'hui, le NPU v1 exécute sur la carte le réseau MNIST entier** (784 → 512 → 256 → 128 → 64 → 10, quantifié par AIfES), et ses logits sont ceux d'AIfES au bit près. La suite du projet, jusqu'au 13 décembre 2026, construit la chaîne logicielle qui le programme : le compilateur, son simulateur doré, un modèle de coût et un autotuner.
 
-La cible : un GEMM ou un réseau s'écrit dans un petit DSL qui sépare **l'algorithme**, ce que l'on calcule, du **schedule** : comment on le découpe en tuiles, et dans quel ordre. Une seconde entrée, en MLIR, part de `linalg.matmul`. Le compilateur, écrit en C, abaisse le programme en nids de boucles, puis émet un **flux de commandes**. Le Cortex-A9 l'envoie au NPU par DMA, et le décodeur du NPU l'exécute. Un simulateur en C sert de référence dorée : le RTL doit lui donner raison au bit près.
+La cible : un GEMM ou un réseau s'écrit dans un petit DSL qui sépare **l'algorithme**, ce que l'on calcule, du **schedule** : comment on le découpe en tuiles, et dans quel ordre. Une seconde entrée, en MLIR, part de `linalg.matmul`. Le compilateur, écrit en C, abaisse le programme en nids de boucles, puis émet un **flux de commandes**. Le runtime du Cortex-A9 décode ce flux et pilote le NPU par ses registres et par DMA. Le même format pourra plus tard être décodé par le NPU lui-même, sans que le compilateur change. Un simulateur en C sert de référence dorée : le RTL doit lui donner raison au bit près.
 
 ```mermaid
 flowchart LR
@@ -15,10 +15,9 @@ flowchart LR
     comp --> cmd["Flux de commandes<br/>docs/interface.md"]
     cmd --> sim["Simulateur doré (C)"]
     cmd --> rt["Runtime bare-metal<br/>Cortex-A9"]
-    rt -- "AXI DMA (HP0)<br/>AXI4-Lite (GP0)" --> dec["NPU : décodeur de commandes"]
-    dec --> v1["v1 : rangée de 8 MAC"]
-    dec --> v2["v2 : tableau 8 × 8"]
-    sim -. "mêmes octets" .- dec
+    rt -- "AXI4-Lite (GP0)<br/>AXI DMA (HP0)" --> v1["NPU v1<br/>rangée de 8 MAC"]
+    rt -. "plus tard" .-> v2["NPU v2<br/>tableau 8 × 8"]
+    sim -. "mêmes résultats" .- v1
 ```
 
 ## Ce qui tourne
@@ -38,47 +37,49 @@ flowchart LR
 
 Les 574 080 poids du réseau dépassent les BRAM du XC7Z020 (573 440 octets) : ceux de la couche 1, 70 % du total, arrivent de la DDR pendant le calcul.
 
-**v2, le tableau systolique 8 × 8** (`rtl/tableau/`). Il calcule un GEMM par tuiles de 8 × 8, avec 64 MAC et des données qui ne voyagent qu'entre PE voisins. Le PE et le tableau existent ; le décalage d'entrée et le contrôleur sont au programme de la semaine 3. Il se branchera derrière le même décodeur de commandes que la v1.
+**v2, le tableau systolique 8 × 8** (`rtl/tableau/`). Il calcule un GEMM par tuiles de 8 × 8, avec 64 MAC et des données qui ne voyagent qu'entre PE voisins. Le PE et le tableau existent ; le décalage d'entrée et le contrôleur viendront après décembre. Il se branchera derrière le même format de commandes que la v1.
 
-**Le contrat** (`docs/interface.md`, v0.9) décrit les registres, le flux, les tampons et le rangement en mémoire, avec le réseau MNIST comme exemple complet. Il passe en v1.0 avec le flux de commandes (semaine 1).
+**Le contrat** (`docs/interface.md`, v0.9) décrit les registres, le flux, les tampons et le rangement en mémoire, avec le réseau MNIST comme exemple complet. Il passe en v1.0 avec le format des commandes (semaine 1).
 
 ## Les trois dernières semaines
 
-Les huit semaines prévues du 5 octobre au 29 novembre ont livré le NPU sur la carte, mais pas encore la chaîne logicielle : le compilateur, le simulateur doré, les mesures. Le plan est resserré en trois semaines, jusqu'au 13 décembre. Chacune finit sur un livrable vérifiable. Le récit est dans le [journal](JOURNAL.md).
+Les huit semaines prévues du 5 octobre au 29 novembre ont livré le NPU sur la carte, mais pas encore la chaîne logicielle. Le plan est resserré en trois semaines, jusqu'au 13 décembre, et centré sur le compilateur. Chacune finit sur un livrable vérifiable. Le récit est dans le [journal](JOURNAL.md).
 
 | Semaine | Objectif | Livrable | État |
 |---|---|---|---|
-| **1** · 23 au 29 nov. | Le flux de commandes, de bout en bout en simulation | Un flux écrit à la main fait tourner MNIST dans le RTL et dans le simulateur doré, avec les mêmes octets | 🚧 |
-| **2** · 30 nov. au 6 déc. | Du DSL à la carte | Le compilateur émet le flux ; GEMM et MNIST tournent sur la carte depuis le DSL ; duel NPU / NEON | ⏳ |
-| **3** · 7 au 13 déc. | Le tableau sur la carte, l'autotuner, MLIR, montrer | v1 et v2 mesurés sur la même carte ; un autotuner guidé par un modèle de coût chiffré ; un dépôt fini | ⏳ |
+| **1** · 23 au 29 nov. | Le flux de commandes et le simulateur doré | Un flux écrit à la main, décodé par le runtime, fait tourner MNIST sur la carte avec les mêmes octets que le simulateur | 🚧 |
+| **2** · 30 nov. au 6 déc. | Du DSL à la carte | Le compilateur émet le flux ; un GEMM et MNIST tournent sur la carte depuis le DSL ; duel NPU / NEON | ⏳ |
+| **3** · 7 au 13 déc. | Mesurer, chercher, MLIR, montrer | Un modèle de coût dont l'erreur est chiffrée, un autotuner, un front-end MLIR, un dépôt fini | ⏳ |
 
-### Semaine 1 · Le flux de commandes
+### Semaine 1 · Le flux de commandes et le simulateur doré
 
 - [ ] Mesurer le réseau sur la carte : cycles par couche (registre DUREE), latence par image, précision sur les 10 000 images de test
 - [ ] Définir le format des commandes dans le contrat, qui passe en v1.0 : opcodes, champs, encodage en mots de 64 bits
-- [ ] Écrire le décodeur de commandes en RTL : il lit le flux du DMA et pilote le moteur à la place des registres ; banc cocotb et mutants
 - [ ] Écrire le simulateur doré en C (`sim/`) : il exécute un flux de commandes avec l'arithmétique d'AIfES, au bit près
-- [ ] Co-simulation : le même flux rejoué dans le RTL et dans le simulateur, comparé octet par octet
+- [ ] Écrire le runtime qui décode le flux sur le Cortex-A9 : registres, DMA de la couche 1, attente
+- [ ] Faire tourner MNIST par un flux écrit à la main, et le comparer au simulateur octet par octet
 - [ ] Figer la grammaire du DSL (`docs/dsl.md`, v1.0), puis écrire le parseur et l'AST
 
 ### Semaine 2 · Du DSL à la carte
 
 - [ ] Abaisser l'AST en nids de boucles selon le schedule, vérifier sa légalité (k en boucle intérieure, tuile N = P), puis émettre le flux de commandes
-- [ ] Nouvelle IP avec le décodeur (VERSION 03), synthèse, bitstream
-- [ ] Runtime bare-metal : un seul transfert DMA pour le flux, gestion du cache, lancement, attente
 - [ ] Un GEMM et le réseau MNIST écrits dans le DSL, compilés, exécutés sur la carte, vérifiés contre le simulateur
 - [ ] Harnais de justesse sur la carte : des GEMM de tailles et de schedules tirés au hasard, comparés au simulateur
+- [ ] Allocation des tampons d'activations sur puce par le compilateur, d'après la durée de vie de chaque tenseur
 - [ ] Référence NEON sur le Cortex-A9 : GEMM int8 en intrinsics, mesuré en cycles
 - [ ] Tableau de mesures : NPU, NEON et OpenCL, bande passante réelle du DMA, relevé d'implémentation (LUT, DSP, BRAM, timing)
 
-### Semaine 3 · Le tableau, l'autotuner, MLIR, montrer
+### Semaine 3 · Mesurer, chercher, MLIR, montrer
 
-- [ ] NPU v2 : décalage d'entrée et contrôleur derrière le décodeur ; bancs cocotb, co-simulation contre le simulateur doré
-- [ ] NPU v2 sur la carte : intégration dans l'IP, synthèse, mesures, duel v1 / v2
 - [ ] Modèle de coût analytique (calcul, DMA, commandes), avec son erreur chiffrée contre la carte ; roofline avec les points mesurés
-- [ ] Autotuner : recherche exhaustive des schedules légaux, guidée par la mesure ou par le modèle ; comparaison avec OpenTuner ou ytopt
+- [ ] Autotuner : recherche exhaustive des schedules légaux, guidée par la mesure ou par le modèle ; comparaison avec OpenTuner et ytopt
 - [ ] Front-end MLIR : `linalg.matmul` abaissé jusqu'au même flux de commandes que le DSL
 - [ ] Montrer : ce README en version finale, une démonstration filmée, un dépôt reproductible, un tableau de correspondance avec l'état de l'art (TPU v1, Eyeriss, VTA, Gemmini)
+
+### Après décembre
+
+- Un décodeur de commandes en RTL, qui lit le flux directement par DMA, pour le même format
+- Le NPU v2 : décalage d'entrée, contrôleur, co-simulation, puis sur la carte, avec un duel v1 / v2
 
 ## Le dépôt
 
@@ -95,7 +96,7 @@ Les huit semaines prévues du 5 octobre au 29 novembre ont livré le NPU sur la 
 | `compiler/` | Le compilateur du DSL, en C (aujourd'hui : le lexeur) |
 | `docs/` | Le contrat d'interface, la grammaire du DSL, le journal des bugs, les notes de lecture |
 
-À venir : `sim/`, le simulateur doré (semaine 1) ; `bench/`, les mesures (semaines 2 et 3) ; `mlir/`, le front-end MLIR (semaine 3).
+À venir : `sim/`, le simulateur doré (semaine 1) ; `bench/`, les mesures et l'autotuner (semaines 2 et 3) ; `mlir/`, le front-end MLIR (semaine 3).
 
 ## Lancer les tests
 
