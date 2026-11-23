@@ -22,7 +22,7 @@ Livrable : deux pages figées, l'interface du NPU et la grammaire du DSL ; un le
 
 ## 9 octobre : OpenCL, troisième cible du GEMM
 
-Deux semaines, jusqu'au 23 octobre, pour une troisième cible du même GEMM : OpenCL, sur GPU et sur CPU. Les leçons 10 et 11 du parcours accélérateurs font écrire un kernel naïf, puis un kernel tuilé en mémoire locale. Ensuite, un prototype d'export C++/OpenCL pour [Aidge](https://eclipse.dev/aidge/), le framework d'IA open source du CEA, dans un dépôt à part. La feuille de route du NPU continue en parallèle. [Jalon « OpenCL et Aidge »](https://github.com/Quentin0l/zynq-npu/milestone/9).
+Deux semaines, jusqu'au 23 octobre, pour une troisième cible du même GEMM : OpenCL, sur GPU et sur CPU. Les leçons 10 et 11 du parcours accélérateurs font écrire un kernel naïf, puis un kernel tuilé en mémoire locale. Ensuite, un prototype d'export C++/OpenCL pour [Aidge](https://eclipse.dev/aidge/), un framework d'IA open source, dans un dépôt à part. La feuille de route du NPU continue en parallèle. [Jalon « OpenCL et Aidge »](https://github.com/Quentin0l/zynq-npu/milestone/9).
 
 **Une mesure à ne pas croire.** Sur le GPU d'Apple, les compteurs de profiling d'OpenCL donnaient des durées environ 50 fois trop courtes, donc des dizaines de milliers de Gop/s. Le banc mesure désormais avec l'horloge de l'hôte.
 

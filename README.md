@@ -80,19 +80,6 @@ Les huit semaines prévues du 5 octobre au 29 novembre ont livré le NPU sur la 
 - [ ] Front-end MLIR : `linalg.matmul` abaissé jusqu'au même flux de commandes que le DSL
 - [ ] Montrer : ce README en version finale, une démonstration filmée, un dépôt reproductible, un tableau de correspondance avec l'état de l'art (TPU v1, Eyeriss, VTA, Gemmini)
 
-### Bilan des huit premières semaines
-
-| Jalon | Ce qui est fait | Ce qui passe dans le nouveau plan |
-|---|---|---|
-| [S1](https://github.com/Quentin0l/zynq-npu/milestone/1) Contrats | Contrat v0.9, lexeur | Contrat v1.0, grammaire du DSL (semaine 1) |
-| [S2](https://github.com/Quentin0l/zynq-npu/milestone/2) Premières commandes | Premières applications bare-metal | Parseur et AST (semaine 1), IR et émission (semaine 2) |
-| [S3](https://github.com/Quentin0l/zynq-npu/milestone/3) Simulateur doré | Enveloppes AXI4-Lite et AXI4-Stream, DMA | Simulateur, co-simulation (semaine 1) |
-| [S4](https://github.com/Quentin0l/zynq-npu/milestone/4) Sur la carte | Block design, bitstream, compteur de cycles, runtime minimal, **MNIST sur la carte** | Premier programme compilé depuis le DSL (semaine 2) |
-| [S5](https://github.com/Quentin0l/zynq-npu/milestone/5) Schedule paramétrable | — | Semaine 2 |
-| [S6](https://github.com/Quentin0l/zynq-npu/milestone/6) Les chiffres | GEMM OpenCL mesuré | NEON, tableau de mesures (semaine 2) |
-| [S7](https://github.com/Quentin0l/zynq-npu/milestone/7) Coût et autotuner | — | Semaine 3 |
-| [S8](https://github.com/Quentin0l/zynq-npu/milestone/8) Montrer | — | Semaine 3 |
-
 ## Le dépôt
 
 | Dossier | Contenu |
